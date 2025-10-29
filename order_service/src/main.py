@@ -13,7 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from src.settings import settings  # pydantic-settings
+from src.settings import settings
 from src.api import api_router
 
 
@@ -124,7 +124,7 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError) 
 
 # ── РОУТЕРЫ ───────────────────────────────────────────────────────────────────
 # Здесь только подключение. Сами обработчики — в .api.*
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
 
 
 # ── ПРИМЕЧАНИЕ ────────────────────────────────────────────────────────────────

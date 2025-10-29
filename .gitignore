@@ -1,0 +1,133 @@
+# ────────────────────────────────
+#  Python / Build Artifacts
+# ────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+.installed.cfg
+
+# ────────────────────────────────
+#  Environment / Dependency Managers
+# ────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.uv/
+.venv-*/
+poetry.lock
+uv.lock
+Pipfile
+Pipfile.lock
+
+# ────────────────────────────────
+#  IDE / Editor Configs
+# ────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# ────────────────────────────────
+#  Logs / Temp Files
+# ────────────────────────────────
+*.log
+*.tmp
+*.temp
+*.out
+nohup.out
+coverage.xml
+htmlcov/
+.cache/
+.pytest_cache/
+.tox/
+.mypy_cache/
+ruff_cache/
+.dmypy.json
+.pyre/
+pytestdebug.log
+
+# ────────────────────────────────
+#  Databases / Runtime Files
+# ────────────────────────────────
+*.db
+*.sqlite3
+*.sqlite
+alembic.ini
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+alembic/versions/*.log
+
+# ────────────────────────────────
+#  Docker / Compose
+# ────────────────────────────────
+# (игнорим build-артефакты, но не Dockerfile)
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/Dockerfile.old
+**/docker-compose.override.yml
+**/.dockerignore
+docker-compose.override.yml
+.docker/
+tmp/
+
+# ────────────────────────────────
+#  Environment Files / Secrets
+# ────────────────────────────────
+.env
+.env.*
+!.env.example        # но пример конфигурации оставляем в репозитории
+*.pem
+*.key
+*.crt
+*.csr
+*.pub
+secrets/
+**/secrets.yaml
+**/secrets.json
+
+# ────────────────────────────────
+#  Coverage / Reports
+# ────────────────────────────────
+.coverage
+coverage.json
+cov_html/
+reports/
+logs/
+test-results.xml
+
+# ────────────────────────────────
+#  Jupyter / Notebooks (если вдруг)
+# ────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ────────────────────────────────
+#  OS Specific / Misc
+# ────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.orig
+*.rej
+
+# ────────────────────────────────
+#  Project specific (AsyncFlow)
+# ────────────────────────────────
+# Игнорим локальные данные сервисов
+order_service/data/
+billing_service/data/
+notification_service/data/
+
+# Игнорим локальные RabbitMQ volume data
+rabbitmq_data/

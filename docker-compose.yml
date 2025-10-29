@@ -1,0 +1,79 @@
+version: "3.9"
+
+x-env-common: &env_common
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_USER: user
+  RABBITMQ_PASS: pass
+
+services:
+  # ─────────────────────────────────────────────
+  #  RabbitMQ Broker
+  # ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: asyncflow_rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"     # AMQP protocol
+      - "15672:15672"   # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-pass}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - asyncflow_net
+
+  # ─────────────────────────────────────────────
+  #  Order Service (FastAPI)
+  # ─────────────────────────────────────────────
+  order_service:
+    build:
+      context: ./order_service
+      dockerfile: Dockerfile
+    container_name: asyncflow_order
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    environment:
+      <<: *env_common
+      PORT: 8081
+      LOG_LEVEL: info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - asyncflow_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+# ─────────────────────────────────────────────
+#  Networks & Volumes
+# ─────────────────────────────────────────────
+networks:
+  asyncflow_net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    driver: local

@@ -1,0 +1,53 @@
+repos:
+  # ---- Ruff (линтер + форматтер) ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.8
+    hooks:
+      - id: ruff
+        name: ruff (all services)
+        args: [--fix]
+      - id: ruff-format
+        name: ruff format (all services)
+
+  # ---- Black (форматирование, если хочешь строгий стиль) ----
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        name: black (all services)
+        language_version: python3.12
+        additional_dependencies: [black>=24.8.0]
+
+  # ---- Mypy (типизация) ----
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: mypy (all services)
+        language_version: python3.12
+        additional_dependencies:
+          - pydantic>=2.7,<3
+          - pydantic-settings>=2.3,<3
+          - sqlalchemy>=2.0,<3
+          - aio-pika>=9,<10
+          - fastapi>=0.115,<1
+        # проверяем все сервисы разом
+        args: [
+          "--pretty",
+          "--show-error-codes",
+          "--namespace-packages",
+          "order_service/src",
+          "billing_service/src",
+          "notification_service/src",
+        ]
+
+  # ---- Pytest (опционально: быстрые тесты) ----
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (order_service)
+        entry: uv run pytest -q --maxfail=1 --disable-warnings -x
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]

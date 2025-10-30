@@ -104,6 +104,11 @@ async def health_check():
     
     return health_info
 
+# Backward/forward-compatible alias: expose health under versioned path as well
+@app.get(f"/api/{settings.API_VERSION}/health", tags=["System"])
+async def health_check_versioned():
+    return await health_check()
+
 @app.get("/metrics", tags=["System"], include_in_schema=settings.ENABLE_METRICS)
 async def metrics():
     """Prometheus metrics endpoint."""

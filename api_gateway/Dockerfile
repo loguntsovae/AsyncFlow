@@ -10,6 +10,12 @@ ARG APP_HOME=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Ensure APP_HOME is available at runtime (not just build-time)
+ENV APP_HOME=${APP_HOME}
+
+# Make src packages importable as top-level (e.g., `from core import ...`)
+ENV PYTHONPATH=${APP_HOME}/src
+
 # Set work directory
 WORKDIR ${APP_HOME}
 

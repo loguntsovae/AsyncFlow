@@ -73,9 +73,6 @@ services:
       ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-9001}
       BILLING_SERVICE_PORT: ${BILLING_SERVICE_PORT:-9002}
       LOG_LEVEL: info
-    depends_on:
-      order_service:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${API_GATEWAY_PORT:-9000}/health"]
       interval: 20s
@@ -83,7 +80,9 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - asyncflow_net
+      asyncflow_net:
+        aliases:
+          - api_gateway
 
   # ─────────────────────────────────────────────
   #  Auth Service (FastAPI)

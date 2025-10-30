@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-# Create log directory if it doesn't exist
-mkdir -p "${APP_HOME}/logs"
+# Create log directory if it doesn't exist (fallback to /app/logs)
+LOG_DIR_PATH="${LOG_DIR:-${APP_HOME:-/app}/logs}"
+mkdir -p "$LOG_DIR_PATH"
 
 # Wait for dependent services if needed
 wait_for_service() {

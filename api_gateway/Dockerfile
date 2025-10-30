@@ -63,4 +63,4 @@ ENV APP_ENV=production \
     LOG_DIR=${APP_HOME}/logs
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["python", "-m", "src.main"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "9000"]

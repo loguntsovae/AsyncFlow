@@ -31,6 +31,29 @@ services:
       - asyncflow_net
 
   # ─────────────────────────────────────────────
+  #  Frontend (React + Nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: asyncflow_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api_gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - asyncflow_net
+
+  # ─────────────────────────────────────────────
   #  API Gateway (FastAPI)
   # ─────────────────────────────────────────────
   api_gateway:

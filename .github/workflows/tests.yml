@@ -28,8 +28,14 @@ jobs:
           cache: 'pip'
 
       # --- Install uv (as in Dockerfile) and sync dependencies with uv ---
-      - name: Install uv
-        run: python -m pip install "uv==0.4.20"
+      - name: Install project and dev/test deps
+        working-directory: order_service
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          # Install runtime dependencies from the project
+          python -m pip install .
+          # Install test & dev tools required for CI runs (matches order_service dependency-groups:dev)
+          python -m pip install httpx pytest pytest-asyncio pytest-cov ruff black mypy types-python-dateutil
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -41,11 +47,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
-
-      - name: Sync dependencies with uv
-        working-directory: order_service
-        run: |
-          uv sync --group dev --yes
 
       # --- Run pytest with coverage (via uv to match runtime) ---
       - name: Run tests (pytest via uv)

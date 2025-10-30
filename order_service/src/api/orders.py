@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from datetime import datetime
@@ -51,12 +51,34 @@ async def create_order(
     )
 
 
-@router.get("", response_model=list[OrderResponse])
+@router.get("")
 async def list_orders(db: AsyncSession = Depends(get_db)):
     """Возвращает список заказов (упрощённо)."""
-    result = await db.execute(text("SELECT id, created_at FROM orders ORDER BY id DESC"))
+    # Return simplified order list with basic fields
+    result = await db.execute(text("SELECT id, user_id, amount, status, created_at FROM orders ORDER BY id DESC"))
     rows = result.fetchall()
     return [
-        OrderResponse(order_id=row.id, created_at=row.created_at, message="OK")
+        {
+            "id": row.id,
+            "user_id": row.user_id,
+            "amount": float(row.amount),
+            "status": row.status,
+            "created_at": row.created_at,
+        }
         for row in rows
     ]
+
+
+@router.get("/{order_id}")
+async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
+    """Get a single order by id."""
+    order = await db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {
+        "id": order.id,
+        "user_id": order.user_id,
+        "amount": float(order.amount),
+        "status": order.status,
+        "created_at": order.created_at,
+    }

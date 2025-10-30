@@ -4,14 +4,27 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from contextlib import asynccontextmanager
+import datetime
+
+import sys
+from pathlib import Path
+
+# Add the project root to Python path
+project_root = str(Path(__file__).parent.parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from src.db.base import Base
 from src.main import app
-# именно эти объекты нам нужны для overrides
 from src.api.dependencies import get_db, get_exchange
+from src.db.models.orders import Order
+from src.models.order_dto import OrderCreate
 import aio_pika
+
+# Provide a default mock exchange on app.state so sync TestClient can access it
+app.state.amqp_exchange = AsyncMock(spec=aio_pika.Exchange)
 
 
 # ==============================
@@ -34,7 +47,7 @@ app.router.lifespan_context = _no_lifespan
 # ==============================
 @pytest.fixture(scope="session")
 async def test_engine():
-    # shared in-memory + StaticPool => одна БД на все коннекты процесса
+    """Create a shared in-memory SQLite database engine for testing."""
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:?cache=shared",
         echo=False,
@@ -43,87 +56,70 @@ async def test_engine():
     )
     from sqlalchemy import text
 
-    async with engine.begin() as conn:
-        await conn.execute(text("PRAGMA foreign_keys=ON"))
-        await conn.run_sync(Base.metadata.create_all)
     try:
+        async with engine.begin() as conn:
+            await conn.execute(text("PRAGMA foreign_keys=ON"))
+            await conn.run_sync(Base.metadata.create_all)
+        
         yield engine
+    
     finally:
+        # Clean up database and dispose engine
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
 
-
-@pytest.fixture()
+@pytest.fixture
 async def db_session(test_engine):
-    SessionTest = async_sessionmaker(
-        bind=test_engine,
-        expire_on_commit=False,
-        autoflush=False,
-        autocommit=False,
-        class_=AsyncSession,
-    )
-    async with SessionTest() as session:
+    """Create a fresh database session for each test."""
+    async_session = async_sessionmaker(test_engine, expire_on_commit=False)
+    async with async_session() as session:
         yield session
+        await session.rollback()
 
+@pytest.fixture
+async def sample_order(db_session):
+    """Create a sample order for testing."""
+    order = Order(
+        user_id=1,
+        amount=100.0,
+        created_at=datetime.datetime.utcnow(),
+        status="pending"
+    )
+    db_session.add(order)
+    await db_session.commit()
+    await db_session.refresh(order)
+    return order
 
-# ==============================
-# 🧪 ПЕРЕОПРЕДЕЛЕНИЕ ЗАВИСИМОСТЕЙ FASTAPI
-# ==============================
-@pytest.fixture(autouse=True)
-def override_db_and_exchange_dependencies(monkeypatch, db_session):
-    # 1) get_db через dependency_overrides
-    async def _get_test_db():
+@pytest.fixture
+def sample_order_create():
+    """Create a sample OrderCreate DTO for testing."""
+    return OrderCreate(user_id=1, amount=100.0)
+
+@pytest.fixture
+async def mock_exchange():
+    """Mock RabbitMQ exchange for testing."""
+    mock = AsyncMock(spec=aio_pika.Exchange)
+    mock.publish = AsyncMock()
+    return mock
+
+@pytest.fixture
+async def client(db_session, mock_exchange):
+    """Test client with mocked dependencies."""
+    # Override dependencies
+    async def override_get_db():
         yield db_session
 
-    app.dependency_overrides[get_db] = _get_test_db
-
-    # 2) мок AMQP exchange через dependency_overrides(get_exchange)
-    mock_exchange = AsyncMock(name="MockExchange")
-    async def _get_test_exchange():
+    async def override_get_exchange():
         return mock_exchange
 
-    app.dependency_overrides[get_exchange] = _get_test_exchange
-
-    # 3) на случай прямого использования SessionLocal из prod-кода — подменим его
-    #    ТОЛЬКО если у тебя где-то есть импорт "from src.db.dependency import SessionLocal"
-    try:
-        from sqlalchemy.ext.asyncio import async_sessionmaker as _asm
-        SessionTest = _asm(bind=db_session.bind, expire_on_commit=False, class_=AsyncSession)
-        monkeypatch.setattr("src.db.dependency.SessionLocal", SessionTest, raising=False)
-    except Exception:
-        # если нет такого импорта/использования — тихо пропускаем
-        pass
-
-    # 4) если код в старте приложения стучится в aio_pika.connect_robust — замокаем его на awaitable
-    mock_connect = AsyncMock(name="MockConnect")
-    mock_channel = AsyncMock(name="MockChannel")
-    mock_connect.channel.return_value = mock_channel
-    monkeypatch.setattr("aio_pika.connect_robust", AsyncMock(return_value=mock_connect), raising=False)
-
-    # ещё положим exchange в app.state на случай прямого доступа
-    app.state.amqp_exchange = mock_exchange
-
-    yield
-
-    # cleanup overrides
-    app.dependency_overrides.pop(get_db, None)
-    app.dependency_overrides.pop(get_exchange, None)
-
-
-# ==============================
-# 🌐 HTTP-КЛИЕНТ БЕЗ LIFESPAN
-# ==============================
-@pytest.fixture
-async def client():
-    # жизненно важно: lifespan="off" — иначе стартовые коннекты улетят в прод
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_exchange] = override_get_exchange
+    # Use ASGITransport so the client talks to the FastAPI app without network
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-
-
-# ==============================
-# Совместимость со старыми тестами
-# ==============================
-@pytest.fixture
-def mock_exchange():
-    # достаём, что положили в app.state
-    return app.state.amqp_exchange
+    async with AsyncClient(transport=transport, base_url="http://test") as test_client:
+        try:
+            yield test_client
+        finally:
+            # Clear dependency overrides after test
+            app.dependency_overrides.clear()

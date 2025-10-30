@@ -1,93 +1,129 @@
+# conftest.py
+import os
 import pytest
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import StaticPool
 from unittest.mock import AsyncMock
+from contextlib import asynccontextmanager
+
 from src.db.base import Base
 from src.main import app
+# именно эти объекты нам нужны для overrides
+from src.api.dependencies import get_db, get_exchange
+import aio_pika
 
 
 # ==============================
-# 🚀 DATABASE FIXTURES (SQLite)
+# 🚫 ОТКЛЮЧАЕМ LIFESPAN/СТАРТОВЫЕ КОННЕКТЫ
 # ==============================
+# Вариант 1: полностью выключим lifespan у httpx-транспорта (см. fixture client)
+# Вариант 2 (доп): перестраховка — заменим lifespan контекст на пустой
 
+@asynccontextmanager
+async def _no_lifespan(_app):
+    # ничего не делаем на старте/остановке
+    yield
+
+# Если в app уже установлен другой lifespan, переопределим:
+app.router.lifespan_context = _no_lifespan
+
+
+# ==============================
+# 🚀 SQLITE ENGINE (shared in-memory)
+# ==============================
 @pytest.fixture(scope="session")
 async def test_engine():
-    """Создаёт in-memory SQLite движок один раз за сессию."""
+    # shared in-memory + StaticPool => одна БД на все коннекты процесса
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+        "sqlite+aiosqlite:///:memory:?cache=shared",
         echo=False,
-        poolclass=NullPool,
+        poolclass=StaticPool,
+        connect_args={"uri": True},
     )
+    from sqlalchemy import text
+
     async with engine.begin() as conn:
+        await conn.execute(text("PRAGMA foreign_keys=ON"))
         await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture()
 async def db_session(test_engine):
-    """Создаёт новую async-сессию на тестовой базе."""
-    async_session = async_sessionmaker(
+    SessionTest = async_sessionmaker(
         bind=test_engine,
         expire_on_commit=False,
         autoflush=False,
         autocommit=False,
+        class_=AsyncSession,
     )
-    async with async_session() as session:
+    async with SessionTest() as session:
         yield session
 
 
+# ==============================
+# 🧪 ПЕРЕОПРЕДЕЛЕНИЕ ЗАВИСИМОСТЕЙ FASTAPI
+# ==============================
 @pytest.fixture(autouse=True)
-def override_db_dependency(monkeypatch, db_session):
-    """Переопределяет все get_db на SQLite-сессию."""
+def override_db_and_exchange_dependencies(monkeypatch, db_session):
+    # 1) get_db через dependency_overrides
     async def _get_test_db():
-        print("⚙️  Using TEST DB (SQLite)")
         yield db_session
 
-    # Подменяем во всех возможных местах
-    monkeypatch.setattr("src.db.dependency.get_db", _get_test_db)
-    monkeypatch.setattr("src.api.dependencies.get_db", _get_test_db)
-    monkeypatch.setattr("src.api.orders.get_db", _get_test_db)
+    app.dependency_overrides[get_db] = _get_test_db
 
+    # 2) мок AMQP exchange через dependency_overrides(get_exchange)
+    mock_exchange = AsyncMock(name="MockExchange")
+    async def _get_test_exchange():
+        return mock_exchange
 
-# ==============================
-# 🐇 RABBITMQ MOCK FIXTURES
-# ==============================
+    app.dependency_overrides[get_exchange] = _get_test_exchange
 
-@pytest.fixture(autouse=True)
-def mock_rabbit_connection(monkeypatch):
-    """Подменяет aio_pika.connect_robust, чтобы не коннектиться к реальному Rabbit."""
+    # 3) на случай прямого использования SessionLocal из prod-кода — подменим его
+    #    ТОЛЬКО если у тебя где-то есть импорт "from src.db.dependency import SessionLocal"
+    try:
+        from sqlalchemy.ext.asyncio import async_sessionmaker as _asm
+        SessionTest = _asm(bind=db_session.bind, expire_on_commit=False, class_=AsyncSession)
+        monkeypatch.setattr("src.db.dependency.SessionLocal", SessionTest, raising=False)
+    except Exception:
+        # если нет такого импорта/использования — тихо пропускаем
+        pass
+
+    # 4) если код в старте приложения стучится в aio_pika.connect_robust — замокаем его на awaitable
     mock_connect = AsyncMock(name="MockConnect")
     mock_channel = AsyncMock(name="MockChannel")
-    mock_exchange = AsyncMock(name="MockExchange")
-
     mock_connect.channel.return_value = mock_channel
-    mock_channel.declare_exchange.return_value = mock_exchange
+    monkeypatch.setattr("aio_pika.connect_robust", AsyncMock(return_value=mock_connect), raising=False)
 
-    monkeypatch.setattr("aio_pika.connect_robust", lambda *_, **__: mock_connect)
-    return mock_exchange
+    # ещё положим exchange в app.state на случай прямого доступа
+    app.state.amqp_exchange = mock_exchange
 
+    yield
 
-@pytest.fixture(autouse=True)
-def mock_app_exchange(mock_rabbit_connection):
-    """Добавляет мокнутый exchange в app.state."""
-    app.state.amqp_exchange = mock_rabbit_connection
-    return app.state.amqp_exchange
+    # cleanup overrides
+    app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_exchange, None)
 
 
 # ==============================
-# 🌐 FASTAPI CLIENT FIXTURE
+# 🌐 HTTP-КЛИЕНТ БЕЗ LIFESPAN
 # ==============================
-
 @pytest.fixture
 async def client():
-    """Создаёт HTTP-клиент с моками и тестовой БД."""
+    # жизненно важно: lifespan="off" — иначе стартовые коннекты улетят в прод
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
+
+# ==============================
+# Совместимость со старыми тестами
+# ==============================
 @pytest.fixture
-def mock_exchange(mock_rabbit_connection):
-    """Совместимая фикстура для старых тестов."""
-    return mock_rabbit_connection
+def mock_exchange():
+    # достаём, что положили в app.state
+    return app.state.amqp_exchange

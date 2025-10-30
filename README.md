@@ -18,33 +18,5 @@ Everything communicates through **RabbitMQ**.
 - Docker Compose
 - uv / Poetry
 
-## 🚀 Run locally
-```bash
-cp .env.example .env
-make up
 
-RabbitMQ Management UI → http://localhost:15672
-Login: user / pass
-
----
-
-## 🧩 common/shared_schemas.py
-
-(чтобы все сервисы могли использовать одни и те же структуры сообщений)
-
-```python
-from pydantic import BaseModel
-from datetime import datetime
-
-class OrderCreated(BaseModel):
-    event: str = "order_created"
-    order_id: int
-    user_id: int
-    amount: float
-
-class PaymentProcessed(BaseModel):
-    event: str = "payment_processed"
-    order_id: int
-    user_id: int
-    status: str
-    processed_at: datetime
+![Tests](https://github.com/<your_username>/<repo_name>/actions/workflows/tests.yml/badge.svg)

@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from fastapi.encoders import jsonable_encoder
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional, Sequence
@@ -107,11 +107,13 @@ app.add_middleware(
 
 # ── ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ ОШИБОК (без бизнес-логики) ─────────────────────────
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    logger.debug("Validation error: %s", exc.errors())
+async def validation_exception_handler(request, exc):
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content=jsonable_encoder({
+            "detail": exc.errors(),
+            "body": exc.body,
+        }),
     )
 
 

@@ -1,4 +1,6 @@
 from datetime import datetime
+from decimal import Decimal
+
 from pydantic import BaseModel, Field, condecimal
 
 # ───────────────────────────────────────────────────────────────
@@ -23,6 +25,9 @@ class OrderResponse(BaseModel):
     message: str = Field(default="OK", description="Описание результата операции")
 
     class Config:
+        json_encoders = {
+            Decimal: float,
+        }
         json_schema_extra = {
             "example": {
                 "order_id": 101,

@@ -1,4 +1,9 @@
 import pytest
+from fastapi.testclient import TestClient
+from src.main import app
+
+client_sync = TestClient(app)
+
 
 @pytest.mark.asyncio
 async def test_create_order_success(client, mock_exchange):
@@ -21,3 +26,9 @@ async def test_create_order_invalid_amount(client):
 
     response = await client.post("/api/orders", json=payload)
     assert response.status_code == 422  # ошибка валидации
+
+
+def test_validation_handler_jsonable():
+    response = client_sync.post("/api/orders", json={"user_id": 1, "amount": -5})
+    assert response.status_code == 422
+    assert "detail" in response.json()

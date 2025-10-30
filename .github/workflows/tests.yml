@@ -1,0 +1,50 @@
+name: 🧪 Run tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      # --- Checkout code ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Setup Python ---
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      # --- Install uv (новый менеджер пакетов) ---
+      - name: Install uv
+        run: pip install uv
+
+      # --- Sync dependencies (с установкой dev-группы) ---
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # --- Run pytest with coverage ---
+      - name: Run tests
+        env:
+          PYTHONPATH: .
+        run: |
+          uv run pytest -v --maxfail=1 --disable-warnings --cov=src --cov-report=term-missing --cov-fail-under=80
+
+      # --- (Optional) Upload coverage report artifact ---
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./.coverage

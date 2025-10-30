@@ -139,11 +139,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
 
-# --- COVERAGE ---
-[tool.coverage.run]
-branch = true
-source = ["src"]
-
 [tool.coverage.report]
 skip_empty = true
 show_missing = true

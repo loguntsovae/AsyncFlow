@@ -1,6 +1,7 @@
 """Gateway metrics collection and reporting."""
 from prometheus_client import Counter, Histogram, generate_latest
 from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 import time
 
 # Define metrics
@@ -22,12 +23,15 @@ UPSTREAM_ERRORS = Counter(
     ['service', 'error_type']
 )
 
-class MetricsMiddleware:
-    async def __call__(self, request: Request, call_next):
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    """Starlette-compatible middleware for collecting Prometheus metrics."""
+
+    async def dispatch(self, request: Request, call_next):
         # Extract service from path
         path_parts = request.url.path.strip("/").split("/")
         service = path_parts[0] if path_parts else "unknown"
-        
+
         start_time = time.time()
         try:
             response = await call_next(request)
@@ -41,6 +45,7 @@ class MetricsMiddleware:
             raise
         finally:
             REQUEST_LATENCY.labels(service=service).observe(time.time() - start_time)
+
 
 def get_metrics():
     """Get current metrics in Prometheus format."""

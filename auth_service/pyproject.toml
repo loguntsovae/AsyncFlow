@@ -3,12 +3,15 @@ name = "auth-service"
 version = "0.1.0"
 description = "Authentication service for AsyncFlow"
 authors = ["Aleksei Loguntsov"]
+packages = [
+    { include = "*", from = "src" } # Corrected the path to avoid nested src/src
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.104.1"
-uvicorn = "^0.24.0"
-pydantic = "^2.4.2"
+uvicorn = {extras = ["standard"], version = "^0.24.0"} # Added standard extras for uvicorn
+pydantic = "^2.4.2" # Ensure the correct version of pydantic is specified
 pydantic-settings = "^2.0.3"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
@@ -16,6 +19,7 @@ sqlalchemy = "^2.0.23"
 alembic = "^1.12.1"
 psycopg2-binary = "^2.9.9"
 python-multipart = "^0.0.6"
+email-validator = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

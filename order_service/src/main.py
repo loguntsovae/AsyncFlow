@@ -32,11 +32,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Инициализируем соединение с RabbitMQ (robust), канал и обменник.
     Кладём всё в app.state.*, чтобы использовать из зависимостей/роутеров.
     """
+    # Build AMQP URL using the real secret value; mask in logs
+    try:
+        pass_value = settings.rabbitmq_pass.get_secret_value()  # pydantic SecretStr
+    except AttributeError:
+        pass_value = str(settings.rabbitmq_pass)
+
     amqp_url = (
-        f"amqp://{settings.rabbitmq_user}:{settings.rabbitmq_pass}"
+        f"amqp://{settings.rabbitmq_user}:{pass_value}"
         f"@{settings.rabbitmq_host}:{settings.rabbitmq_port}/"
     )
-    logger.info("Connecting to RabbitMQ: %s", amqp_url.replace(settings.rabbitmq_pass, "******"))
+    logger.info("Connecting to RabbitMQ: %s", amqp_url.replace(pass_value, "******"))
 
     connection: Optional[aio_pika.RobustConnection] = None
     channel: Optional[aio_pika.abc.AbstractChannel] = None

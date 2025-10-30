@@ -2,16 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Runtime Python settings
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src
+
 # Install uv for faster package installation
 RUN pip install --no-cache-dir uv==0.4.20
 
-# Copy project files
+# Copy dependency definitions and project files
 COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 COPY src/ ./src/
 
-# Install dependencies
+# Install dependencies directly from pyproject.toml using uv
 RUN uv pip install --system --no-cache --compile .
 
 # Default port (can be overridden)
@@ -20,20 +25,23 @@ ENV AUTH_SERVICE_PORT=9003
 # Expose the port
 EXPOSE ${AUTH_SERVICE_PORT}
 
-# Create startup script using separate RUN commands for better Docker layer caching
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'set -e' >> /app/start.sh && \
-    echo 'echo "Waiting for database..."' >> /app/start.sh && \
-    echo 'while ! nc -z ${POSTGRES_HOST:-postgres} ${POSTGRES_PORT:-5432}; do sleep 1; done' >> /app/start.sh && \
-    echo 'echo "Database is ready!"' >> /app/start.sh && \
-    echo 'echo "Running migrations..."' >> /app/start.sh && \
-    echo 'alembic upgrade head' >> /app/start.sh && \
-    echo 'echo "Starting Auth Service on port ${AUTH_SERVICE_PORT}..."' >> /app/start.sh && \
-    echo 'exec uvicorn src.main:app --host 0.0.0.0 --port ${AUTH_SERVICE_PORT}' >> /app/start.sh && \
-    chmod +x /app/start.sh
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Install netcat for health checks
-RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+# Install tools used by entrypoint and healthcheck
+RUN apt-get update \
+     && apt-get install -y --no-install-recommends \
+         netcat-openbsd \
+         wget \
+         curl \
+         ca-certificates \
+     && rm -rf /var/lib/apt/lists/*
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget -qO- http://localhost:${AUTH_SERVICE_PORT}/health >/dev/null || exit 1
 
 # Run the application
-CMD ["/app/start.sh"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["uvicorn", "src.main:app"]

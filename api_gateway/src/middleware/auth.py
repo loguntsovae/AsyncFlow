@@ -2,22 +2,53 @@ from fastapi import Request, HTTPException, status
 from core.config import settings
 from core.security import verify_token
 
+def is_public_path(path: str, method: str) -> bool:
+    """Check if the path is public or should bypass auth.
 
-def is_public_path(path: str) -> bool:
-    """Check if the path is public."""
-    if path == "health":
+    Supports both bare and versioned API prefixes (e.g., /api/v1/...).
+    Also allows health and docs endpoints, and CORS preflight.
+    """
+    # Allow CORS preflight
+    if method.upper() == "OPTIONS":
         return True
-        
-    path_parts = path.strip("/").split("/")
-    if len(path_parts) < 2:
+
+    normalized = path.strip("/")
+
+    # Health endpoints
+    if normalized == "health" or normalized == f"api/{settings.API_VERSION}/health":
+        return True
+
+    # Docs and OpenAPI
+    docs_candidates = {
+        "docs",
+        "redoc",
+        "openapi.json",
+        f"api/{settings.API_VERSION}/docs",
+        f"api/{settings.API_VERSION}/redoc",
+        f"api/{settings.API_VERSION}/openapi.json",
+    }
+    if normalized in docs_candidates:
+        return True
+
+    # Determine service and remaining path with optional versioned prefix
+    parts = normalized.split("/") if normalized else []
+    if not parts:
         return False
-        
-    service = path_parts[0]
+
+    # Handle /api/{version}/{service}/...
+    idx = 0
+    if len(parts) >= 2 and parts[0] == "api" and parts[1] == settings.API_VERSION:
+        idx = 2
+
+    if len(parts) <= idx:
+        return False
+
+    service = parts[idx]
     if service not in settings.SERVICE_ROUTES:
         return False
-        
+
+    remaining_path = "/" + "/".join(parts[idx + 1:]) if len(parts) > idx + 1 else "/"
     service_config = settings.SERVICE_ROUTES[service]
-    remaining_path = "/" + "/".join(path_parts[1:])
     return remaining_path in service_config["public_paths"]
 
 
@@ -26,7 +57,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     
     # Skip authentication for public paths
-    if is_public_path(path):
+    if is_public_path(path, request.method):
         return await call_next(request)
     
     # Get token from header

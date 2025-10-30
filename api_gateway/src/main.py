@@ -11,7 +11,7 @@ import structlog
 
 from core.config import settings
 from core.services import forward_request
-from core.metrics import MetricsMiddleware, get_metrics
+from middleware.metrics import MetricsMiddleware, get_metrics
 from middleware.auth import auth_middleware
 from middleware.rate_limit import rate_limit_middleware
 

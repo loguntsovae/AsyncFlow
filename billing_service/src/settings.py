@@ -14,15 +14,12 @@ class LogLevel(str, Enum):
 
 
 class Settings(BaseSettings):
-    """
-    Application settings with environment variable support.
-    All settings can be overridden using environment variables.
-    """
-    # Service Settings
-    service_name: str = Field("order_service", description="Service name for logs and tracing")
+    """Billing Service settings with environment variable support."""
+    # Service
+    service_name: str = Field("billing_service", description="Service name for logs and tracing")
     environment: str = Field("development", description="Deployment environment")
 
-    # RabbitMQ Settings
+    # RabbitMQ
     rabbitmq_user: str = Field("user", description="RabbitMQ username")
     rabbitmq_pass: SecretStr = Field("pass", description="RabbitMQ password")
     rabbitmq_host: str = Field("rabbitmq", description="RabbitMQ hostname")
@@ -32,24 +29,14 @@ class Settings(BaseSettings):
         description="RabbitMQ exchange name for event publishing"
     )
 
-    # Database Settings
+    # Database
     db_user: str = Field("postgres", description="Database username")
     db_pass: SecretStr = Field("postgres", description="Database password")
     db_host: str = Field("db", description="Database hostname")
-    db_port: int = Field(5432, ge=1, le=65535, description="Database port")
-    db_name: str = Field("order_service", description="Database name")
+    db_port: int = Field(5434, ge=1, le=65535, description="Database port")
+    db_name: str = Field("billing_service", description="Database name")
     db_pool_size: int = Field(5, ge=1, le=20, description="Database connection pool size")
     db_use_ssl: bool = Field(False, description="Enable SSL for database connection")
-
-    # Security Settings
-    cors_origins: Optional[List[str]] = Field(
-        None,
-        description="Allowed CORS origins. Set via CORS_ORIGINS env var as comma-separated list"
-    )
-    trusted_hosts: Optional[List[str]] = Field(
-        None,
-        description="Trusted host patterns. Set via TRUSTED_HOSTS env var as comma-separated list"
-    )
 
     # Logging
     log_level: LogLevel = Field(
@@ -57,17 +44,10 @@ class Settings(BaseSettings):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
     )
 
-    @validator("cors_origins", "trusted_hosts", pre=True)
-    def parse_list_from_str(cls, v):
-        """Parse comma-separated string into list."""
-        if isinstance(v, str):
-            return [i.strip() for i in v.split(",") if i.strip()]
-        return v
-
     @property
     def database_url(self) -> str:
         """Build SQLAlchemy database URL."""
-        # Use in-memory SQLite for testing if no host is set
+        # Use in-memory SQLite for testing
         if self.environment == "test" or not self.db_host:
             return "sqlite+aiosqlite:///:memory:"
         
@@ -82,6 +62,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_nested_delimiter = "__"
         case_sensitive = True
+
 
 # Global settings instance
 settings = Settings()

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+# Create log directory if it doesn't exist
+mkdir -p "${APP_HOME}/logs"
+
+# Wait for dependent services if needed
+wait_for_service() {
+    host="$1"
+    port="$2"
+    echo "Waiting for $host:$port..."
+    while ! nc -z "$host" "$port"; do
+        sleep 1
+    done
+    echo "$host:$port is available"
+}
+
+# Example: Wait for auth service
+if [ -n "$AUTH_SERVICE_HOST" ] && [ -n "$AUTH_SERVICE_PORT" ]; then
+    wait_for_service "$AUTH_SERVICE_HOST" "$AUTH_SERVICE_PORT"
+fi
+
+# Run the application
+exec "$@"

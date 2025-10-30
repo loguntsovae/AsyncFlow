@@ -1,15 +1,12 @@
 [project]
-name = "order_service"
+name = "billing_service"
 version = "0.1.0"
-description = "AsyncFlow · Order Service (FastAPI + RabbitMQ + Async SQLAlchemy)"
+description = "AsyncFlow · Billing Service (RabbitMQ + Async SQLAlchemy)"
 readme = "README.md"
 requires-python = ">=3.12"
 
 # --- RUNTIME DEPENDENCIES ---
 dependencies = [
-  # Web
-  "fastapi>=0.115,<1.0",
-  "uvicorn[standard]>=0.30,<1.0",
   # Messaging / RabbitMQ
   "aio-pika>=9.4,<10",
   # Settings / Validation
@@ -26,14 +23,6 @@ dependencies = [
   "anyio>=4.4,<5",
   "aiosqlite>=0.21.0",
 ]
-
-[project.optional-dependencies]
-# Additional features can be added here if needed (e.g., email, compression)
-# "extras" = ["aiosmtplib>=3,<4"]
-
-# --- UV SETTINGS ---
-[tool.uv]
-# Empty block - uv reads dependency-groups below
 
 [dependency-groups]
 dev = [
@@ -71,7 +60,6 @@ addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=ter
 source = ["src"]
 branch = true
 
-# --- RUFF (linter + import sorter) ---
 [tool.ruff]
 target-version = "py312"
 line-length = 100
@@ -90,6 +78,7 @@ select = [
 ignore = [
   "E501",            # line length control
 ]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # allow asserts in tests
 
@@ -98,13 +87,11 @@ preview = true
 quote-style = "double"
 indent-style = "space"
 
-# --- BLACK (форматтер) ---
 [tool.black]
 target-version = ["py312"]
 line-length = 100
 skip-string-normalization = true
 
-# --- MYPY (strict typing) ---
 [tool.mypy]
 python_version = "3.12"
 strict = true
@@ -126,23 +113,13 @@ plugins = [
   "sqlalchemy.ext.mypy.plugin",
 ]
 
-# Source code location
 mypy_path = ["src"]
 
-# Relax rules for tests
 [[tool.mypy.overrides]]
 module = "tests.*"
 strict = false
-minversion = "8.0"
-addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=term-missing"
-testpaths = ["tests"]
-pythonpath = ["src"]
-asyncio_mode = "auto"
 
 [tool.coverage.report]
 skip_empty = true
 show_missing = true
 fail_under = 80
-
-[tool.alembic]
-# Common paths can be stored here, main config stays in alembic/

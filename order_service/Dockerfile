@@ -41,11 +41,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_SYSTEM_PYTHON=1 \
     PYTHONPATH=/app \
-    PORT=8081
+    PORT=9001
 
-EXPOSE 8081
+EXPOSE 9001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/health || exit 1
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "9001"]

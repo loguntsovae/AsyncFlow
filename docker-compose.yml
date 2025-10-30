@@ -40,18 +40,18 @@ services:
     container_name: asyncflow_order
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "9001:9001"
     env_file:
       - .env
     environment:
       <<: *env_common
-      PORT: 8081
+      PORT: 9001
       LOG_LEVEL: info
     depends_on:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
       interval: 20s
       timeout: 5s
       retries: 5

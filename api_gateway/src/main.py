@@ -1,14 +1,11 @@
-import logging
 import datetime
 import uuid
 from contextlib import asynccontextmanager
-from typing import Dict, Any
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
 import httpx
 import structlog
 

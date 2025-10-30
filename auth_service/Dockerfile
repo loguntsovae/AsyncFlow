@@ -2,21 +2,23 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install poetry
-RUN pip install poetry
+# Install uv for faster package installation
+RUN pip install --no-cache-dir uv==0.4.20
 
 # Copy project files
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 COPY src/ ./src/
 
 # Install dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+RUN uv pip install --system --no-cache --compile .
+
+# Default port (can be overridden)
+ENV AUTH_SERVICE_PORT=9003
 
 # Expose the port
-EXPOSE 9003
+EXPOSE ${AUTH_SERVICE_PORT}
 
 # Create startup script
 RUN echo '#!/bin/sh\n\

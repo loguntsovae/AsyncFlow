@@ -16,7 +16,7 @@ Everything communicates through **RabbitMQ**.
 - aio-pika
 - RabbitMQ
 - Docker Compose
-- uv / Poetry
+- uv (Fast Python Package Installer)
 
 
 ![Tests](https://github.com/<your_username>/<repo_name>/actions/workflows/tests.yml/badge.svg)

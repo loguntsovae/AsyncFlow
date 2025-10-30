@@ -24,15 +24,14 @@ RUN apt-get update \
     && mkdir -p ${APP_HOME}/logs \
     && chown -R ${APP_USER}:${APP_GROUP} ${APP_HOME}
 
-# Install poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
+# Install uv for faster package installation
+RUN pip install --no-cache-dir uv==0.4.20
 
 # Copy dependency files
-COPY --chown=${APP_USER}:${APP_GROUP} pyproject.toml poetry.lock* ./
+COPY --chown=${APP_USER}:${APP_GROUP} pyproject.toml ./
 
 # Install dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+RUN uv pip install --system --no-cache --compile .
 
 # Copy application code
 COPY --chown=${APP_USER}:${APP_GROUP} src/ ./src/
@@ -44,11 +43,14 @@ USER ${APP_USER}
 VOLUME ["${APP_HOME}/logs"]
 
 # Expose the port
-EXPOSE 9000
+# Default port (can be overridden)
+ENV API_GATEWAY_PORT=9000
+
+EXPOSE ${API_GATEWAY_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${API_GATEWAY_PORT}/health || exit 1
 
 # Set entry point script
 COPY --chown=${APP_USER}:${APP_GROUP} docker-entrypoint.sh /usr/local/bin/

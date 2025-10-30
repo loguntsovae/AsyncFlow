@@ -40,12 +40,12 @@ services:
     container_name: asyncflow_order
     restart: unless-stopped
     ports:
-      - "9001:9001"
+      - "${ORDER_SERVICE_PORT:-9001}:${ORDER_SERVICE_PORT:-9001}"
     env_file:
       - .env
     environment:
       <<: *env_common
-      PORT: 9001
+      ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-9001}
       LOG_LEVEL: info
     depends_on:
       rabbitmq:

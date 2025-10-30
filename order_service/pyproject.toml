@@ -60,10 +60,12 @@ where = ["."]
 include = ["src*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]
 testpaths = ["src/tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+minversion = "8.0"
+addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["src"]
@@ -131,9 +133,6 @@ mypy_path = ["src"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 strict = false
-
-# --- PYTEST ---
-[tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=term-missing"
 testpaths = ["tests"]
@@ -150,6 +149,5 @@ skip_empty = true
 show_missing = true
 fail_under = 80
 
-# --- ALEMBIC (минимально, остальное в alembic.ini / env.py) ---
 [tool.alembic]
 # можно хранить общие пути тут для удобства, но основная конфигурация остаётся в alembic/

@@ -33,24 +33,31 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = Field(["*"], env="CORS_ORIGINS")
     CORS_ALLOW_CREDENTIALS: bool = Field(True, env="CORS_ALLOW_CREDENTIALS")
     
-    # Service routes configuration
-    SERVICE_ROUTES: Dict[str, Dict[str, str]] = {
-        "auth": {
-            "host": f"http://auth_service:{Field(9003, env='AUTH_SERVICE_PORT')}",
-            "prefix": "auth",
-            "public_paths": ["/register", "/token"]
-        },
-        "orders": {
-            "host": f"http://order_service:{Field(9001, env='ORDER_SERVICE_PORT')}",
-            "prefix": "orders",
-            "public_paths": []
-        },
-        "billing": {
-            "host": f"http://billing_service:{Field(9002, env='BILLING_SERVICE_PORT')}",
-            "prefix": "billing",
-            "public_paths": []
+    # Per-service ports (can be overridden via env)
+    AUTH_SERVICE_PORT: int = Field(9003, env="AUTH_SERVICE_PORT")
+    ORDER_SERVICE_PORT: int = Field(9001, env="ORDER_SERVICE_PORT")
+    BILLING_SERVICE_PORT: int = Field(9002, env="BILLING_SERVICE_PORT")
+
+    # Service routes configuration (computed from ports so Field() isn't used inside strings)
+    @property
+    def SERVICE_ROUTES(self) -> Dict[str, Dict[str, str]]:
+        return {
+            "auth": {
+                "host": f"http://auth_service:{self.AUTH_SERVICE_PORT}",
+                "prefix": "auth",
+                "public_paths": ["/register", "/token"]
+            },
+            "orders": {
+                "host": f"http://order_service:{self.ORDER_SERVICE_PORT}",
+                "prefix": "orders",
+                "public_paths": []
+            },
+            "billing": {
+                "host": f"http://billing_service:{self.BILLING_SERVICE_PORT}",
+                "prefix": "billing",
+                "public_paths": []
+            }
         }
-    }
     
     # JWT configuration
     JWT_SECRET_KEY: str = "your-secret-key"  # Should match auth service

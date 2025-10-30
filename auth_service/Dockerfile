@@ -20,17 +20,21 @@ ENV AUTH_SERVICE_PORT=9003
 # Expose the port
 EXPOSE ${AUTH_SERVICE_PORT}
 
-# Create startup script
-RUN echo '#!/bin/sh\n\
-# Wait for database\n\
-while !</dev/tcp/$POSTGRES_HOST/$POSTGRES_PORT; do sleep 1; done;\n\
-\n\
-# Run migrations\n\
 alembic upgrade head\n\
-\n\
-# Start application\n\
-python -m src.main' > /app/start.sh \
-    && chmod +x /app/start.sh
+# Create startup script
+RUN cat <<'EOF' > /app/start.sh
+#!/bin/sh
+# Wait for database
+while !</dev/tcp/$POSTGRES_HOST/$POSTGRES_PORT; do sleep 1; done;
+
+# Run migrations
+alembic upgrade head
+
+# Start application with uvicorn using AUTH_SERVICE_PORT
+exec uvicorn src.main:app --host 0.0.0.0 --port ${AUTH_SERVICE_PORT}
+EOF
+
+RUN chmod +x /app/start.sh
 
 # Run the application
 CMD ["/app/start.sh"]

@@ -36,14 +36,6 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
 
-
-            # Ensure response body is not consumed multiple times
-            if isinstance(response, StreamingResponse):
-                original_body = b"".join([chunk async for chunk in response.body_iterator])
-                response.body_iterator = iter([original_body])
-                response.headers["Content-Length"] = str(len(original_body))
-
-
             REQUEST_COUNT.labels(service=service, status=response.status_code).inc()
             return response
         except Exception as e:

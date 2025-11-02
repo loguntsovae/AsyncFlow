@@ -50,27 +50,27 @@ app = FastAPI(
 )
 
 # Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=settings.CORS_ORIGINS,
+#     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # Add GZip compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add metrics middleware if enabled
-if settings.ENABLE_METRICS:
-    app.add_middleware(MetricsMiddleware)
+# if settings.ENABLE_METRICS:
+#     app.add_middleware(MetricsMiddleware)
 
 # Add rate limiting if enabled
-if settings.RATE_LIMIT_ENABLED:
-    app.middleware("http")(rate_limit_middleware)
+# if settings.RATE_LIMIT_ENABLED:
+    # app.middleware("http")(rate_limit_middleware)
 
 # Add authentication middleware
-app.middleware("http")(auth_middleware)
+# app.middleware("http")(auth_middleware)
 
 
 @app.get("/health", tags=["System"])

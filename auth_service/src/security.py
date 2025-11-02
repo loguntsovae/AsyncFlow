@@ -4,7 +4,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
 
 from settings import settings
 from db.base import get_db
@@ -44,7 +45,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)  # Use AsyncSession
 ) -> User:
     """Get current user from JWT token."""
     credentials_exception = HTTPException(
@@ -52,7 +53,7 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = jwt.decode(
             token, 
@@ -64,11 +65,14 @@ async def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
-    user = db.query(User).filter(User.username == username).first()
+
+    result = await db.execute(
+        sa.select(User).where(User.username == username)
+    )
+    user = result.scalar()
     if user is None:
         raise credentials_exception
-    
+
     return user
 
 

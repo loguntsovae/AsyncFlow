@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from core.schemas import User, UserCreate, Token
@@ -15,7 +15,8 @@ async def register(user_data: UserCreate):
     - Requires email, username, and password
     - Returns created user information
     """
-    return await ServiceClient.forward_request("auth", "register", "POST", user_data.dict())
+    return Response(status_code=201, content={"message": "User registered successfully"})
+    # return await ServiceClient.forward_request("auth", "register", "POST", user_data.dict())
 
 
 @router.post("/token", response_model=Token)

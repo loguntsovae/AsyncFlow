@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir uv==0.4.20
 # Copy dependency definitions and project files
 COPY pyproject.toml ./
 COPY alembic.ini ./
+COPY README.md ./
 COPY migrations/ ./migrations/
 COPY src/ ./src/
 

@@ -96,30 +96,33 @@ async def update_user_me(
 ):
     """Update current user information."""
     if user_update.email and user_update.email != current_user.email:
-        if db.query(User).filter(User.email == user_update.email).first():
+        result = await db.execute(sa.select(User).where(User.email == user_update.email))
+        if result.scalar():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
         current_user.email = user_update.email
-    
+
     if user_update.username and user_update.username != current_user.username:
-        if db.query(User).filter(User.username == user_update.username).first():
+        result = await db.execute(sa.select(User).where(User.username == user_update.username))
+        if result.scalar():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already taken"
             )
         current_user.username = user_update.username
-    
+
     if user_update.password:
         current_user.hashed_password = security.get_password_hash(user_update.password)
-    
+
     if user_update.is_active is not None:
         current_user.is_active = user_update.is_active
-    
-    db.commit()
-    db.refresh(current_user)
-    
+
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
     return current_user
 
 
@@ -136,8 +139,9 @@ async def read_users(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
         )
-    
-    users = db.query(User).offset(skip).limit(limit).all()
+
+    result = await db.execute(sa.select(User).offset(skip).limit(limit))
+    users = result.scalars().all()
     return users
 
 

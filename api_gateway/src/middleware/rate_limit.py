@@ -1,8 +1,8 @@
 """Rate limiting middleware."""
 from fastapi import Request, HTTPException
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
-import time
+from typing import Dict
+
 
 class RateLimiter:
     def __init__(self, requests_per_minute: int = 60):

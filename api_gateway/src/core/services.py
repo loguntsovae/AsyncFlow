@@ -78,9 +78,9 @@ async def forward_request(request: Request) -> Any:
                 follow_redirects=True,
                 timeout=settings.DEFAULT_TIMEOUT,
             )
-
+            
             return StreamingResponse(
-                response.aiter_raw(),
+                content=bytes(response.content or b""),
                 status_code=response.status_code,
                 headers=dict(response.headers),
                 media_type=response.headers.get("content-type")

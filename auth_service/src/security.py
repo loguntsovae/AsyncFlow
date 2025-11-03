@@ -1,28 +1,64 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from typing import Optional
+
+import logging
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
+from passlib.context import CryptContext
 
 from settings import settings
 from db.base import get_db
 from db.models.users import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# ---
+# Парольный контекст:
+#  - основная схема: bcrypt_sha256 (снимает лимит 72 байта)
+#  - legacy: bcrypt (чтобы проверять уже сохранённые хэши)
+# ---
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256", "bcrypt"],
+    default="bcrypt_sha256",
+    deprecated="auto",
+)
+
+# Корректный относительный URL для токена (через ваш /auth/token endpoint)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+# ---
+# Хэширование и верификация
+# ---
+
+def get_password_hash(password: str) -> str:
+    """
+    Возвращает хэш пароля, используя bcrypt_sha256 (по умолчанию).
+    ВНИМАНИЕ: пароль не логируем.
+    """
+    if not isinstance(password, str):
+        raise TypeError("password must be a str")
+    # passlib сам все корректно кодирует; лимиты 72 байта для 'bcrypt' нас не касаются,
+    # т.к. основная схема 'bcrypt_sha256' предварительно хэширует пароль SHA-256.
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Generate password hash."""
-    return pwd_context.hash(password)
+    """
+    Проверяет пароль против хэша (поддерживает и bcrypt_sha256, и legacy bcrypt).
+    """
+    if not isinstance(plain_password, str) or not isinstance(hashed_password, str):
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as exc:
+        logger.warning("Password verification failed: %s", exc.__class__.__name__)
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

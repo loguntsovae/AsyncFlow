@@ -8,7 +8,7 @@ function App() {
   const [showSignIn, setShowSignIn] = useState(false)
   const [showSignUp, setShowSignUp] = useState(false)
   const [signInData, setSignInData] = useState({ username: '', password: '' })
-  const [signUpData, setSignUpData] = useState({ username: '', password: '' })
+  const [signUpData, setSignUpData] = useState({ username: '', email: '', password: '' })
   const [showAuthForm, setShowAuthForm] = useState(false)
   const [authData, setAuthData] = useState({ username: '', password: '' })
 
@@ -23,7 +23,11 @@ function App() {
         setLoading(false)
       }
     }
+
     checkHealth()
+    const interval = setInterval(checkHealth, 10 * 60 * 1000) // Check health every 10 minutes
+
+    return () => clearInterval(interval) // Cleanup interval on component unmount
   }, [])
 
   const toggleSignIn = () => setShowSignIn(!showSignIn)
@@ -57,6 +61,14 @@ function App() {
 
   const handleSignUpSubmit = async (e) => {
     e.preventDefault()
+    if (!signUpData.username || !signUpData.email || !signUpData.password) {
+      alert('All fields are required!')
+      return
+    }
+    if (signUpData.password.length < 6) {
+      alert('Password must be at least 6 characters long!')
+      return
+    }
     try {
       const response = await axios.post('/api/v1/auth/register', signUpData)
       alert(`Registration successful: ${response.data.message}`)
@@ -205,6 +217,16 @@ function App() {
                 value={signUpData.username}
                 onChange={handleSignUpChange}
                 placeholder="Choose a username"
+              />
+            </label>
+            <label>
+              Email:
+              <input
+                type="email"
+                name="email"
+                value={signUpData.email}
+                onChange={handleSignUpChange}
+                placeholder="Enter your email"
               />
             </label>
             <label>

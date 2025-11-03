@@ -22,6 +22,7 @@ python-multipart = "^0.0.6"
 # --- Security & Auth ---
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 passlib = { extras = ["bcrypt"], version = "^1.7.4" }
+bcrypt = { version = "^4.3.0" }
 
 # --- Database & ORM ---
 sqlalchemy = { version = "^2.0.23", extras = ["asyncio"] }

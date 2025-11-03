@@ -15,7 +15,14 @@ async def register(user_data: UserCreate):
     - Requires email, username, and password
     - Returns created user information
     """
-    return Response(status_code=201, content={"message": "User registered successfully"})
+    raise NotImplementedError("User registration is handled by the auth service.")
+
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=201,
+        content={"message": "User registered successfully"}
+    )
     # return await ServiceClient.forward_request("auth", "register", "POST", user_data.dict())
 
 

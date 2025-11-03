@@ -7,14 +7,14 @@ import sqlalchemy as sa
 
 import security
 from settings import settings
-from db.base import get_db, async_session
+from db.base import get_db
 from db.models.users import User
 import schemas
 
 app = FastAPI(title="AsyncFlow Auth Service")
 
 
-@app.post("/auth/register", response_model=schemas.User)
+@app.post("/register", response_model=schemas.User)
 async def register_user(
     user_data: schemas.UserCreate,
     db: AsyncSession = Depends(get_db)  # Use async session

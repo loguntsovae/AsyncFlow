@@ -11,9 +11,9 @@ import structlog
 
 from core.config import settings
 from core.services import forward_request
-from middleware.metrics import MetricsMiddleware, get_metrics
-from middleware.auth import auth_middleware
-from middleware.rate_limit import rate_limit_middleware
+from middleware import MetricsMiddleware, get_metrics
+from middleware import auth_middleware
+from middleware import rate_limit_middleware
 
 # Configure structured logging
 structlog.configure(
@@ -50,27 +50,27 @@ app = FastAPI(
 )
 
 # Add CORS middleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=settings.CORS_ORIGINS,
-#     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Add GZip compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add metrics middleware if enabled
-# if settings.ENABLE_METRICS:
-#     app.add_middleware(MetricsMiddleware)
+if settings.ENABLE_METRICS:
+    app.add_middleware(MetricsMiddleware)
 
 # Add rate limiting if enabled
-# if settings.RATE_LIMIT_ENABLED:
-    # app.middleware("http")(rate_limit_middleware)
+if settings.RATE_LIMIT_ENABLED:
+    app.middleware("http")(rate_limit_middleware)
 
 # Add authentication middleware
-# app.middleware("http")(auth_middleware)
+app.middleware("http")(auth_middleware)
 
 
 @app.get("/health", tags=["System"])
@@ -142,6 +142,7 @@ async def api_gateway(request: Request, version: str, path: str):
     
     try:
         response = await forward_request(request)
+        
         logger.info(
             "request_completed",
             request_id=request_id,
@@ -156,9 +157,6 @@ async def api_gateway(request: Request, version: str, path: str):
             error_type=type(e).__name__
         )
         raise
-
-
-
 
 
 if __name__ == "__main__":

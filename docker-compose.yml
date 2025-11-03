@@ -1,0 +1,243 @@
+version: "3.9"
+
+x-env-common: &env_common
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_USER: user
+  RABBITMQ_PASS: pass
+
+services:
+  # ─────────────────────────────────────────────
+  #  PostgreSQL Database (shared)
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: asyncflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # POSTGRES_DB can be omitted since we create multiple DBs via init script
+    ports:
+      - "${POSTGRES_PORT_PUBLIC:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asyncflow_net
+
+  # ─────────────────────────────────────────────
+  #  pgAdmin 4 (optional GUI)
+  # ─────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:8.12
+    container_name: asyncflow_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - asyncflow_net
+  # ─────────────────────────────────────────────
+  #  RabbitMQ Broker
+  # ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: asyncflow_rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"     # AMQP protocol
+      - "15672:15672"   # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-pass}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - asyncflow_net
+
+  # ─────────────────────────────────────────────
+  #  Frontend (React + Nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: asyncflow_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api_gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - asyncflow_net
+
+  # ─────────────────────────────────────────────
+  #  API Gateway (FastAPI)
+  # ─────────────────────────────────────────────
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: asyncflow_api_gateway
+    restart: unless-stopped
+    ports:
+      - "${API_GATEWAY_PORT:-9000}:${API_GATEWAY_PORT:-9000}"
+    env_file:
+      - .env
+    environment:
+      <<: *env_common
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT:-9000}
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-9003}
+      ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-9001}
+      BILLING_SERVICE_PORT: ${BILLING_SERVICE_PORT:-9002}
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${API_GATEWAY_PORT:-9000}/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      asyncflow_net:
+        aliases:
+          - api_gateway
+
+  # ─────────────────────────────────────────────
+  #  Auth Service (FastAPI)
+  # ─────────────────────────────────────────────
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    container_name: asyncflow_auth
+    restart: unless-stopped
+    ports:
+      - "${AUTH_SERVICE_PORT:-9003}:${AUTH_SERVICE_PORT:-9003}"
+    env_file:
+      - .env
+    environment:
+      <<: *env_common
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-9003}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${AUTH_SERVICE_PORT:-9003}/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - asyncflow_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────
+  #  Order Service (FastAPI)
+  # ─────────────────────────────────────────────
+  order_service:
+    build:
+      context: ./order_service
+      dockerfile: Dockerfile
+    container_name: asyncflow_order
+    restart: unless-stopped
+    ports:
+      - "${ORDER_SERVICE_PORT:-9001}:${ORDER_SERVICE_PORT:-9001}"
+    env_file:
+      - .env
+    environment:
+      <<: *env_common
+      ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-9001}
+      DB_HOST: ${POSTGRES_HOST:-postgres}
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${ORDER_SERVICE_DB:-orders_db}
+      LOG_LEVEL: info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${ORDER_SERVICE_PORT:-9001}/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - asyncflow_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # ─────────────────────────────────────────────
+  #  Billing Service (consumer)
+  # ─────────────────────────────────────────────
+  billing_service:
+    build:
+      context: ./billing_service
+      dockerfile: Dockerfile
+    container_name: asyncflow_billing
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *env_common
+      DB_HOST: ${POSTGRES_HOST:-postgres}
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${BILLING_SERVICE_DB:-billing_db}
+      LOG_LEVEL: info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - asyncflow_net
+
+# ─────────────────────────────────────────────
+#  Networks & Volumes
+# ─────────────────────────────────────────────
+networks:
+  asyncflow_net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  postgres_data:
+    driver: local

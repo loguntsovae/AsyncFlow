@@ -1,0 +1,148 @@
+[project]
+name = "order_service"
+version = "0.1.0"
+description = "AsyncFlow · Order Service (FastAPI + RabbitMQ + Async SQLAlchemy)"
+readme = "README.md"
+requires-python = ">=3.12"
+
+# --- RUNTIME DEPENDENCIES ---
+dependencies = [
+  # Web
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.30,<1.0",
+  # Messaging / RabbitMQ
+  "aio-pika>=9.4,<10",
+  # Settings / Validation
+  "pydantic>=2.7,<3",
+  "pydantic-settings>=2.3,<3",
+  # Database (async SQLAlchemy + asyncpg)
+  "sqlalchemy>=2.0,<3",
+  "asyncpg>=0.29,<1.0",
+  "greenlet>=3.2.4",
+  # Migrations
+  "alembic>=1.13,<2",
+  # Utils
+  "python-dotenv>=1.0,<2",
+  "anyio>=4.4,<5",
+  "aiosqlite>=0.21.0",
+]
+
+[project.optional-dependencies]
+# Additional features can be added here if needed (e.g., email, compression)
+# "extras" = ["aiosmtplib>=3,<4"]
+
+# --- UV SETTINGS ---
+[tool.uv]
+# Empty block - uv reads dependency-groups below
+
+[dependency-groups]
+dev = [
+  # Lint/Format
+  "ruff>=0.6,<1",
+  "black>=24.8,<25",
+
+  # Typing
+  "mypy>=1.10,<2",
+  "types-python-dateutil>=2.9.0.20240316",
+
+  # Tests
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.23,<1",
+  "pytest-cov>=4.1,<5"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["src/tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+minversion = "8.0"
+addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+# --- RUFF (linter + import sorter) ---
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+fix = true
+unsafe-fixes = false
+select = [
+  "E", "F",          # pycodestyle / pyflakes
+  "I",               # isort
+  "UP",              # pyupgrade
+  "B",               # bugbear
+  "SIM",             # simplify
+  "C90",             # mccabe complexity
+  "PL",              # pylint rules
+  "RUF",             # ruff-specific
+]
+ignore = [
+  "E501",            # line length control
+]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # allow asserts in tests
+
+[tool.ruff.format]
+preview = true
+quote-style = "double"
+indent-style = "space"
+
+# --- BLACK (форматтер) ---
+[tool.black]
+target-version = ["py312"]
+line-length = 100
+skip-string-normalization = true
+
+# --- MYPY (strict typing) ---
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+
+plugins = [
+  "pydantic.mypy",
+  "sqlalchemy.ext.mypy.plugin",
+]
+
+# Source code location
+mypy_path = ["src"]
+
+# Relax rules for tests
+[[tool.mypy.overrides]]
+module = "tests.*"
+strict = false
+minversion = "8.0"
+addopts = "-ra -q --strict-markers --disable-warnings --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.coverage.report]
+skip_empty = true
+show_missing = true
+fail_under = 80
+
+[tool.alembic]
+# Common paths can be stored here, main config stays in alembic/

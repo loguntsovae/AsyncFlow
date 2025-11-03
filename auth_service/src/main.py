@@ -1,0 +1,151 @@
+from datetime import timedelta
+from typing import List
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
+
+import security
+from settings import settings
+from db.base import get_db
+from db.models.users import User
+import schemas
+
+app = FastAPI(title="AsyncFlow Auth Service")
+
+
+@app.post("/register", response_model=schemas.User)
+async def register_user(
+    user_data: schemas.UserCreate,
+    db: AsyncSession = Depends(get_db)  # Use async session
+):
+    """Register a new user."""
+    # Check if user exists
+    result = await db.execute(
+        sa.select(User).where(User.email == user_data.email)
+    )
+    if result.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    result = await db.execute(
+        sa.select(User).where(User.username == user_data.username)
+    )
+    if result.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+
+    # Create new user
+    hashed_password = security.get_password_hash(user_data.password)
+    db_user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=hashed_password
+    )
+
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+
+    return db_user
+
+
+@app.post("/auth/token", response_model=schemas.Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)  # Use async session
+):
+    """Login to get access token."""
+    result = await db.execute(
+        sa.select(User).where(User.username == form_data.username)
+    )
+    user = result.scalar()
+    if not user or not security.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        data={"sub": user.username},
+        expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/auth/me", response_model=schemas.User)
+async def read_users_me(
+    current_user: User = Depends(security.get_current_active_user)
+):
+    """Get current user information."""
+    return current_user
+
+
+@app.put("/auth/me", response_model=schemas.User)
+async def update_user_me(
+    user_update: schemas.UserUpdate,
+    current_user: User = Depends(security.get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update current user information."""
+    if user_update.email and user_update.email != current_user.email:
+        result = await db.execute(sa.select(User).where(User.email == user_update.email))
+        if result.scalar():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        current_user.email = user_update.email
+
+    if user_update.username and user_update.username != current_user.username:
+        result = await db.execute(sa.select(User).where(User.username == user_update.username))
+        if result.scalar():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+        current_user.username = user_update.username
+
+    if user_update.password:
+        current_user.hashed_password = security.get_password_hash(user_update.password)
+
+    if user_update.is_active is not None:
+        current_user.is_active = user_update.is_active
+
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
+    return current_user
+
+
+@app.get("/auth/users", response_model=List[schemas.User])
+async def read_users(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(security.get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get list of users (requires superuser)."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+
+    result = await db.execute(sa.select(User).offset(skip).limit(limit))
+    users = result.scalars().all()
+    return users
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}

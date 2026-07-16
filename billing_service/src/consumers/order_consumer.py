@@ -117,7 +117,8 @@ class OrderConsumer:
         )
         
         message = aio_pika.Message(
-            body=json.dumps(event.model_dump()).encode(),
+            # model_dump_json handles Decimal and datetime; json.dumps(model_dump()) does not
+            body=event.model_dump_json().encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT
         )
         

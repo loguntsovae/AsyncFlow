@@ -113,7 +113,7 @@ services:
       AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-9003}
       ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-9001}
       BILLING_SERVICE_PORT: ${BILLING_SERVICE_PORT:-9002}
-      LOG_LEVEL: info
+      LOG_LEVEL: INFO
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${API_GATEWAY_PORT:-9000}/health"]
       interval: 20s
@@ -145,7 +145,7 @@ services:
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      LOG_LEVEL: info
+      LOG_LEVEL: INFO
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${AUTH_SERVICE_PORT:-9003}/health"]
       interval: 20s
@@ -179,7 +179,7 @@ services:
       DB_USER: ${POSTGRES_USER:-postgres}
       DB_PASS: ${POSTGRES_PASSWORD:-postgres}
       DB_NAME: ${ORDER_SERVICE_DB:-orders_db}
-      LOG_LEVEL: info
+      LOG_LEVEL: INFO
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -220,7 +220,7 @@ services:
       DB_USER: ${POSTGRES_USER:-postgres}
       DB_PASS: ${POSTGRES_PASSWORD:-postgres}
       DB_NAME: ${BILLING_SERVICE_DB:-billing_db}
-      LOG_LEVEL: info
+      LOG_LEVEL: INFO
     depends_on:
       rabbitmq:
         condition: service_healthy

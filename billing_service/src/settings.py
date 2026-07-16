@@ -61,7 +61,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_nested_delimiter = "__"
-        case_sensitive = True
 
 
 # Global settings instance

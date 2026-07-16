@@ -62,7 +62,6 @@ pytestdebug.log
 *.db
 *.sqlite3
 *.sqlite
-alembic.ini
 alembic/versions/*.pyc
 alembic/versions/__pycache__/
 alembic/versions/*.log
@@ -86,7 +85,7 @@ tmp/
 # ────────────────────────────────
 .env
 .env.*
-!.env.example        # но пример конфигурации оставляем в репозитории
+!.env.example
 *.pem
 *.key
 *.crt

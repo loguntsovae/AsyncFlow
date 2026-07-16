@@ -48,6 +48,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     channel: Optional[aio_pika.abc.AbstractChannel] = None
     exchange: Optional[aio_pika.abc.AbstractExchange] = None
 
+    # Создаём схему на старте (демо-режим: compose up работает без отдельного шага миграций).
+    # В реальном деплое это заменяется на alembic upgrade в entrypoint.
+    from src.db.base import Base, engine
+    from src.db.models import orders as _orders_models  # noqa: F401 — регистрация моделей в Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database schema ensured")
+
     try:
         connection = await aio_pika.connect_robust(amqp_url)
         channel = await connection.channel()

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -63,8 +64,47 @@ async def get_rabbitmq() -> AsyncIterator[aio_pika.abc.AbstractExchange]:
         logger.info("RabbitMQ connection closed")
 
 
+def start_health_server(port: int = 9002) -> None:
+    """Minimal HTTP /health endpoint in a daemon thread.
+
+    Billing is a queue consumer, but the gateway and k8s probes still need an
+    HTTP liveness signal. Stdlib server — no extra dependencies.
+    """
+    import http.server
+    import threading
+
+    class HealthHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            if self.path == "/health":
+                body = b'{"status": "healthy", "service": "billing"}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, *args):  # silence per-request noise
+            pass
+
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    logger.info("Health endpoint listening on :%d/health", port)
+
+
 async def main() -> None:
     """Main service entry point."""
+    start_health_server(int(os.environ.get("BILLING_SERVICE_PORT", "9002")))
+
+    # Create tables on startup (demo-friendly: compose up needs no migration step).
+    from src.db.base import Base, engine
+    from src.db.models import payments as _payments_models  # noqa: F401
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database schema ensured")
+
     async with get_rabbitmq() as exchange:
         # Setup consumer
         consumer = OrderConsumer(exchange)

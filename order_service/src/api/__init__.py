@@ -6,3 +6,5 @@ api_router = APIRouter()
 api_router.include_router(orders_router, prefix="/api")
 # Mount health endpoints under /api so tests use /api/health
 api_router.include_router(health_router, prefix="/api")
+# Also expose bare /health — the gateway and k8s probes use the conventional path
+api_router.include_router(health_router)
